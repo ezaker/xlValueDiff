@@ -8,4 +8,4 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = True
 Option Explicit
-Private Const VERSION As String = "2.2.0"
+Private Const VERSION As String = "2.2.1"
