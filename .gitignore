@@ -1,0 +1,18 @@
+# Excel workbooks (release builds go on GitHub Releases)
+*.xlsm
+*.xlsb
+*.xlsx
+*.xls
+
+# Excel temp/lock files
+~$*
+*.tmp
+
+# Working folder for your day-to-day workbook
+work/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
