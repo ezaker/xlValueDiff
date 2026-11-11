@@ -1,13 +1,13 @@
 Attribute VB_Name = "Reset"
-Public Sub Auto_Open()
+Option Explicit
+'Option Private Module
+
+Public Sub Reset_main()
 '2014-06-25: Setup macro workbook: remove highlighting, set scroll area, etc.
 
 'SAVE EXCEL STATE HERE?
 
     Application.DisplayAlerts = False
-    
-    MasterMacroStr = ActiveWorkbook.Name
-    Set ControlPanel = Workbooks(MasterMacroStr).Sheets("Master Control Panel")
     
     If Not IsEmpty(NewStr) Then
             NewStr = ""
@@ -16,7 +16,7 @@ Public Sub Auto_Open()
             OldStr = ""
     End If
         
-    With ControlPanel
+    With wksMain
         .ScrollArea = "A1:K14"
         'Set status color areas
         Set GrngNewFileCell = .Range("B4:B8")
@@ -36,7 +36,7 @@ End Sub
 Public Sub GetOptions()
 
     'Colors
-    With ControlPanel
+    With wksMain
         GoptHL = .Range("B9").Interior.Color
         GoptIncHL = .Range("B10").Interior.Color
         GoptRemHL = .Range("B11").Interior.Color
@@ -56,5 +56,5 @@ Public Sub GetOptions()
 End Sub
 
 Private Function getBoxValue(ByVal ShapeName As String) As Boolean
-    getBoxValue = IIf(ControlPanel.Shapes(ShapeName).ControlFormat.Value = 1, True, False)
+    getBoxValue = IIf(wksMain.Shapes(ShapeName).ControlFormat.Value = 1, True, False)
 End Function

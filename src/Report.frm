@@ -19,10 +19,3 @@ Private Sub ShtComments_Click()
 
 End Sub
 
-Private Sub Label4_Click()
-
-End Sub
-
-Private Sub UserForm_Click()
-
-End Sub

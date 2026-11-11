@@ -1,4 +1,7 @@
 Attribute VB_Name = "SubFunctions"
+Option Explicit
+Option Private Module
+
 Public Sub ArrPush(ByRef anArray As Variant, ByVal anElement As Variant)
 'Adds an element to the end of an array. 1D array only.
 '2014-05-17: Added error support for empty arrays.

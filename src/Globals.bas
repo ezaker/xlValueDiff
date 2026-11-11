@@ -1,8 +1,6 @@
 Attribute VB_Name = "Globals"
-'********************************************************************************************************************************
-'REVISION LOG
-'********************************************************************************************************************************
-'2014-09-17: AppendComment, CompareFiles, logDiff
+Option Explicit
+Option Private Module
 
 '********************************************************************************************************************************
 'GLOBAL CONSTANTS
@@ -22,10 +20,6 @@ Public appEnableEvents As Boolean
 Public appScreenUpdating As Boolean
 
 'Macro control
-Public MasterMacroStr As String 'Macro's workbook name
-Public MacroBook As Workbook
-Public ControlPanel As Worksheet
-
 Public GrngNewFileCell As Range 'Background of Open New File button
 Public GrngOldFileCell As Range 'Background of Open Old File button
 Public GrngCompareFilesCell As Range 'Background of Compare Files button

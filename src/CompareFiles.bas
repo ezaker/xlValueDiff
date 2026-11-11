@@ -1,4 +1,7 @@
 Attribute VB_Name = "CompareFiles"
+Option Explicit
+'Option Private Module
+
 Public Sub CompareFiles()
 'Checks each value in each sheets to same cell in second workbook
 'Option Explicit
@@ -100,19 +103,13 @@ GetOptions
 ExcelStateSave
 startTime = Time
 
-With rProgress
-    .ProgressBar1.Min = 0
-    .ProgressBar1.Max = 100
-    .StartUpPosition = 2
-    .ProgressBar1.Visible = True
-    .Caption = "Initializing"
-    .Show vbModeless
-    .ProgressBar1.Value = 0
-End With
+    Application.StatusBar = "Initializing"
+    Application.Cursor = xlWait
 
 'Create new log file on every run
 createLog
-Workbooks(MasterMacroStr).Activate
+
+    wkbXLvalueDiff.Activate
 
 'Loop through all sheets in New workbook
 For Each sheet In Workbooks(NewStr).Sheets
@@ -130,8 +127,7 @@ For Each sheet In Workbooks(NewStr).Sheets
     
 'Why not reference sheet instead of by name?
     sht = sheet.Name
-    rProgress.Caption = "Comparing " & sht & "..."
-    rProgress.ProgressBar1.Value = 0
+    Application.StatusBar = "Comparing " & sht & "..."
         
     'See if sheet exists in old file.
     If Not SheetExists(sht, Workbooks(OldStr)) Then
@@ -202,14 +198,8 @@ For Each sheet In Workbooks(NewStr).Sheets
         
             Sheet_Diffs = UBound(arrDiffs) + 1
             
-            With rProgress
-                .ProgressBar1.Max = Sheet_Diffs
-                .Caption = "Commenting/highlighting differences..."
-                .ProgressBar1.Value = 0
-            End With
+            Application.StatusBar = "Commenting/highlighting differences..."
         
-            
-            
             If Sheet_Diffs >= WARN_NUM_DIFFS Then
                 guiContinue = MsgBox("There are " & Sheet_Diffs & " differences. Commenting/highlighting changes can take a while and lock up Excel. Continue and mark all entries?", vbExclamation + vbYesNo, "Compare Files Macro")
                 'If guiContinue = vbNo Then Exit For
@@ -266,7 +256,6 @@ For Each sheet In Workbooks(NewStr).Sheets
                     End If
                     
                     nLoops = nLoops + 1
-                    rProgress.ProgressBar1.Value = x
                 Next x
             End If
         End If
@@ -276,11 +265,8 @@ For Each sheet In Workbooks(NewStr).Sheets
             'Only run if options call for it. Detect for false positive?
             If Not IsArrayEmpty(arrSames) Then
             
-                With rProgress
-                    .ProgressBar1.Max = UBound(arrSames) + 1
-                    .Caption = "Checking similarities..."
-                    .ProgressBar1.Value = 0
-                End With
+                Application.StatusBar = "Checking similarities..."
+
                 For x = 0 To UBound(arrSames)
                     xRow = arrSames(x)(0)
                     xCol = arrSames(x)(1)
@@ -315,7 +301,6 @@ For Each sheet In Workbooks(NewStr).Sheets
                     End If
                     
                     nLoops = nLoops + 1
-                    rProgress.ProgressBar1.Value = x
                 Next x
             End If
         
@@ -362,10 +347,9 @@ makeSameLen AddedSheets, RemovedSheets 'Make lists same length to display correc
 ExcelStateRestore
 
 'Arrange windows
-Workbooks(MasterMacroStr).Activate
+wkbXLvalueDiff.Activate
 Workbooks(OldStr).Activate
 Workbooks(NewStr).Activate
-If CreateLogFile Then Workbooks(gLogName).Activate
 
 DoEvents
 
@@ -374,7 +358,11 @@ endTime = Time
 runTime = (endTime - startTime) * 24 * 3600
 runTime = Format(runTime, "0.00")
 
-rProgress.Hide
+'Progress: Complete
+    Application.Cursor = xlDefault
+    Application.StatusBar = False
+    'Application.ScreenUpdating = True
+
 With Report
     .ndeltas = Book_Diffs
     .ndif = Book_UnHLs
@@ -530,13 +518,18 @@ End Function
 
 Private Sub makeSameLen(ByRef List1 As String, ByRef List2 As String)
 
-    arrlines1 = Split(List1, Chr(10))
+    Dim arrLines1 As Variant
+    Dim arrLines2 As Variant
+    Dim extraLines As Long
+    Dim x As Long
+
+    arrLines1 = Split(List1, Chr(10))
     arrLines2 = Split(List2, Chr(10))
     
-    extralines = UBound(arrlines1) - UBound(arrLines2)
+    extraLines = UBound(arrLines1) - UBound(arrLines2)
         
-    For x = 1 To Abs(extralines)
-        If (extralines > 0) Then
+    For x = 1 To Abs(extraLines)
+        If (extraLines > 0) Then
             List2 = List2 & Chr(10)
         Else
             List1 = List1 & Chr(10)
