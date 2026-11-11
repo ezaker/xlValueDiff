@@ -1,18 +1,14 @@
 Attribute VB_Name = "Comment"
-Public Sub AppendComment(Addr As String, str As String, Optional Color As Long, Optional wkb As Variant, Optional FCMsheet As Variant)
+Option Explicit
+Option Private Module
+
+Public Function AppendComment(Addr As String, str As String, Color As Long, ByRef wkb As Workbook, shtCur As Variant)
 'Adds comment, if there already was a comment it adds to the end
 '2014-09-17: Changed color check to use IsHL to account for white. -EZ
 
     Dim old As String
-    On Error Resume Next
-    If IsMissing(wkb) Then
-        wkb = NewUDSstr
-    End If
-    If IsMissing(FCMsheet) Then
-        appendSht = sht
-    Else: appendSht = FCMsheet
-    End If
-    With Workbooks(wkb).Sheets(appendSht).Range(Addr)
+
+    With wkb.Sheets(shtCur).Range(Addr)
     If Not .Comment Is Nothing Then
         old = .Comment.Text
         If InStr(1, old, str, vbTextCompare) = 0 Then
@@ -32,9 +28,9 @@ Public Sub AppendComment(Addr As String, str As String, Optional Color As Long, 
         End If
     End If
     If Color <> 0 Then
-        If Not IsHL(Workbooks(wkb).Sheets(appendSht).Range(Addr)) Then '2014-09-17
+        If Not IsHL(wkb.Sheets(shtCur).Range(Addr)) Then
             .Interior.Color = Color
         End If
     End If
     End With
-End Sub
+End Function

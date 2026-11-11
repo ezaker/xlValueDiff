@@ -2,12 +2,14 @@ Attribute VB_Name = "CompareFiles"
 Option Explicit
 'Option Private Module
 
-Public Sub CompareFiles()
 'Checks each value in each sheets to same cell in second workbook
 'Option Explicit
 '2014-09-17: If same value, then logs oldVal, newVal [NO CHANGE]. -EZ
 '2016-08-18: Changed max highlights to 100,000.
 '   No problem running on test file. Commenting is slow. Froze above 64000; left at 1000.
+Public Function CompareFiles_Main(ByRef wkbNew As Workbook, ByRef wkbOld As Workbook) As Boolean
+
+    Const F_NAME As String = "CompareFiles_Main()"
 
 Const TAB_COLOR_NOCHANGE As Long = xlNone
 Const TAB_COLOR_ALLMARKED As Long = 49406
@@ -19,17 +21,16 @@ Const MAX_HIGHLIGHTS As Long = 100000
 Const LOOPS_DOEVENTS As Integer = 1000
 Const WARN_NUM_DIFFS As Integer = 500
 
+    Dim Sht As String
+    
+    Dim Sheets_Added As String
+    Dim Sheets_Removed As String
 
-Dim AddedSheets As String
-Dim RemovedSheets As String
 
 Dim startTime As Date
 
 Dim endTime As Date
 Dim runTime As String
-
-'Options
-Dim CancelLoops As Integer
 
 'Objects
 Dim sheet As Worksheet
@@ -84,62 +85,44 @@ Dim arrNewVals() As Variant
 Dim arrOldVals() As Variant
 
 
-'New/old workbooks open?
-If Not OpenFile(NewStr, gNewFilePath, GrngNewFileCell, "Select NEW file...") Then
-    Debug.Print "New file wasn't opened."
-    Exit Sub
-End If
-If Not OpenFile(OldStr, gOldFilePath, GrngOldFileCell, "Select OLD file...") Then
-    Debug.Print "OLD file wasn't opened."
-    Exit Sub
-End If
+    On Error GoTo Catch
+    
+Try:
+    startTime = Time
 
-
-'RESET VARIABLES
-AddedSheets = "" 'CHANGE TO ARRAY
-RemovedSheets = "" 'CHANGE TO ARRAY
-
-GetOptions
-ExcelStateSave
-startTime = Time
-
+'Macro safe states
     Application.StatusBar = "Initializing"
     Application.Cursor = xlWait
+    Application.EnableEvents = False
+    Application.ScreenUpdating = False
 
-'Create new log file on every run
-createLog
-
-    wkbXLvalueDiff.Activate
 
 'Loop through all sheets in New workbook
-For Each sheet In Workbooks(NewStr).Sheets
-
-    'Save DisplayPageBreaks state, turn it off.
-    appDisplayPageBreaks = sheet.DisplayPageBreaks
-    sheet.DisplayPageBreaks = False
+For Each sheet In wkbNew.Sheets
     
     'Clear filters, unhide columns and rows.
     On Error Resume Next
     sheet.ShowAllData
     sheet.Cells.EntireColumn.Hidden = False
     sheet.Cells.EntireRow.Hidden = False
-    On Error GoTo 0
+    
+On Error GoTo Catch
     
 'Why not reference sheet instead of by name?
-    sht = sheet.Name
-    Application.StatusBar = "Comparing " & sht & "..."
+    Sht = sheet.Name
+    Application.StatusBar = "Comparing " & Sht & "..."
         
     'See if sheet exists in old file.
-    If Not SheetExists(sht, Workbooks(OldStr)) Then
+    If Not SheetExists(Sht, wkbOld) Then
         'See if sheet is marked
         If (sheet.Tab.ColorIndex = xlNone) Then
-            sheet.Tab.Color = GoptHL
+            sheet.Tab.Color = g_Options.Color_Highlight
         End If
 'PUSH TO ARRAY!!!
-        If AddedSheets <> "" Then
-            AddedSheets = AddedSheets & Chr(10)
+        If Sheets_Added <> "" Then
+            Sheets_Added = Sheets_Added & Chr(10)
         End If
-        AddedSheets = AddedSheets & sht
+        Sheets_Added = Sheets_Added & Sht
         
     Else 'Sheet also exists in old workbook, check cells...
     
@@ -151,31 +134,31 @@ For Each sheet In Workbooks(NewStr).Sheets
         Sheet_FalseHLs = 0
         
         'Remove highlight colors
-        If (GoptRemAllHL) Then
+        If (g_Options.Mode_RemoveAll) Then
             sheet.Tab.ColorIndex = xlNone 'Remove all highlight colors
-        ElseIf (GoptRemoveHL) Then 'Remove highlight color
-            If sheet.Tab.Color = GoptHL Then sheet.Tab.ColorIndex = xlNone
+        ElseIf (g_Options.Mode_RemoveHL) Then 'Remove highlight color
+            If sheet.Tab.Color = g_Options.Color_Highlight Then sheet.Tab.ColorIndex = xlNone
         End If
             
 '       Union old and new sheet ranges (area only, not object)
-        RngAddress = unionUsedRanges(sheet.UsedRange, Workbooks(OldStr).Sheets(sht).UsedRange)
+        RngAddress = unionUsedRanges(sheet.UsedRange, wkbOld.Sheets(Sht).UsedRange)
         Set rng = sheet.Range(RngAddress)
         'Set rng = Union(sheet.Range("A1"), sheet.UsedRange, sheet.Range(Workbooks(OldStr).Sheets(sht).UsedRange.Address))
         
         
-        TotalCols = rng.Columns.count
-        TotalRows = rng.Rows.count
+        TotalCols = rng.Columns.Count
+        TotalRows = rng.Rows.Count
                     
 '           Pull data into arrays
 
-        If rng.count > 1 Then
+        If rng.Count > 1 Then
             arrNewVals = rng.Value
-            arrOldVals = Workbooks(OldStr).Sheets(sht).Range(rng.Address).Value
+            arrOldVals = wkbOld.Sheets(Sht).Range(rng.Address).Value
         Else 'Only one cell
             ReDim arrNewVals(1, 1)
             ReDim arrOldVals(1, 1)
             arrNewVals(1, 1) = rng.Value
-            arrOldVals(1, 1) = Workbooks(OldStr).Sheets(sht).Range(rng.Address).Value
+            arrOldVals(1, 1) = wkbOld.Sheets(Sht).Range(rng.Address).Value
         End If
 'Pull array of highlights?
         
@@ -223,10 +206,11 @@ For Each sheet In Workbooks(NewStr).Sheets
                     End If
                     
                     'Comment cell
-                    If GoptCommentNew Then
+                    If g_Options.CommentNew Then
                         If x <= MAX_COMMENTS Then
 'Does this highlight over the original color?
-                            AppendComment rng.Cells(xRow, xCol).Address, strOldVal, GoptHL, NewStr
+                            AppendComment rng.Cells(xRow, xCol).Address, strOldVal, g_Options.Color_Highlight, wkbNew, Sht
+                            
                         ElseIf x = (MAX_COMMENTS + 1) Then
                             MsgBox "The max amount of comments (" & MAX_COMMENTS & ") has been reached. " & _
                                 "Further cells will not be commented, but all differences are logged.", _
@@ -234,9 +218,9 @@ For Each sheet In Workbooks(NewStr).Sheets
                         End If
                     End If
                     
-                    If (Not (GoptCommentNew) Or (x > MAX_COMMENTS)) And (x < MAX_HIGHLIGHTS) Then
+                    If (Not (g_Options.CommentNew) Or (x > MAX_COMMENTS)) And (x < MAX_HIGHLIGHTS) Then
                             If Not IsHL(rng.Cells(xRow, xCol)) Then
-                                rng.Cells(xRow, xCol).Interior.Color = GoptHL
+                                rng.Cells(xRow, xCol).Interior.Color = g_Options.Color_Highlight
                             End If
                     ElseIf x = MAX_HIGHLIGHTS Then
                         MsgBox "The max amount of highlights (" & MAX_HIGHLIGHTS & ") has been reached. " & _
@@ -245,9 +229,9 @@ For Each sheet In Workbooks(NewStr).Sheets
                     End If
                     
                     'Log Differences
-                    If GoptCreateLogFile Then
-                        logDiff sht, rng.Cells(xRow, xCol), strOldVal, strNewVal, GoptAddLinksLog
-                    End If
+'                    If GoptCreateLogFile Then
+'                        logDiff Sht, rng.Cells(xRow, xCol), strOldVal, strNewVal, GoptAddLinksLog
+'                    End If
                     
                     'DoEvents after certain amount of loops; keeps Excel responding.
                     If nLoops = LOOPS_DOEVENTS Then
@@ -274,23 +258,23 @@ For Each sheet In Workbooks(NewStr).Sheets
                     'If cell is highlighted, it is marked incorrectly.
                     If IsHL(rng.Cells(xRow, xCol)) Then
                         Sheet_FalseHLs = Sheet_FalseHLs + 1
-                        If GoptMarkIncHL Then rng.Cells(xRow, xCol).Interior.Color = GoptIncHL
+                        If g_Options.Mode_Incorrect Then rng.Cells(xRow, xCol).Interior.Color = g_Options.Color_Incorrect
 
                         'Log bad highlights
-                        If GoptCreateLogFile Then
-                            logDiff sht, rng.Cells(xRow, xCol), arrOldVals(xRow, xCol), arrNewVals(xRow, xCol) & " [NO CHANGE]", GoptAddLinksLog '2014-09-17
-                        End If
+'                        If GoptCreateLogFile Then
+'                            logDiff Sht, rng.Cells(xRow, xCol), arrOldVals(xRow, xCol), arrNewVals(xRow, xCol) & " [NO CHANGE]", GoptAddLinksLog '2014-09-17
+'                        End If
                     End If
                         
                     'Remove all highlight colors?
-                    If (GoptRemAllHL) Then
+                    If (g_Options.Mode_RemoveAll) Then
                         rng.Cells(xRow, xCol).Interior.ColorIndex = xlNone
-                    ElseIf (GoptRemoveHL) Then 'Remove selected highlight color.
-                        If rng.Cells(xRow, xCol).Interior.Color = GoptRemHL Then rng.Cells(xRow, xCol).Interior.ColorIndex = xlNone
+                    ElseIf (g_Options.Mode_RemoveHL) Then 'Remove selected highlight color.
+                        If rng.Cells(xRow, xCol).Interior.Color = g_Options.Color_Remove Then rng.Cells(xRow, xCol).Interior.ColorIndex = xlNone
                     End If
                     
                     'Remove comments?
-                    If (GoptRemoveComm) And Not (rng.Cells(xRow, xCol).Comment Is Nothing) Then
+                    If (g_Options.RemoveComments) And Not (rng.Cells(xRow, xCol).Comment Is Nothing) Then
                         rng.Cells(xRow, xCol).Comment.Delete
                     End If
 
@@ -321,10 +305,6 @@ For Each sheet In Workbooks(NewStr).Sheets
         Book_FalseHLs = Book_FalseHLs + Sheet_FalseHLs
         
     End If
-
-    'Restore DisplayPageBreaks
-    sheet.DisplayPageBreaks = appDisplayPageBreaks
-    'DoEvents
     
 Next sheet
 
@@ -332,24 +312,22 @@ Next sheet
 
 'Find sheets removed from Old workbook
 On Error Resume Next
-For Each sheet In Workbooks(OldStr).Sheets
-    If (Trim(sheet.Name) <> Trim(Workbooks(NewStr).Sheets(sheet.Name).Name)) Then
-        If RemovedSheets <> "" Then RemovedSheets = RemovedSheets & Chr(10)
-        RemovedSheets = RemovedSheets & sheet.Name
-    End If
-Next sheet
-On Error GoTo 0
+    For Each sheet In wkbOld.Sheets
+        If (Trim(sheet.Name) <> Trim(wkbNew.Sheets(sheet.Name).Name)) Then
+            If Sheets_Removed <> "" Then Sheets_Removed = Sheets_Removed & Chr(10)
+            Sheets_Removed = Sheets_Removed & sheet.Name
+        End If
+    Next sheet
 
-FinalizeLog
+On Error GoTo Catch
 
-makeSameLen AddedSheets, RemovedSheets 'Make lists same length to display correctly
+makeSameLen Sheets_Added, Sheets_Removed 'Make lists same length to display correctly
 
-ExcelStateRestore
 
 'Arrange windows
 wkbXLvalueDiff.Activate
-Workbooks(OldStr).Activate
-Workbooks(NewStr).Activate
+wkbOld.Activate
+wkbNew.Activate
 
 DoEvents
 
@@ -358,17 +336,12 @@ endTime = Time
 runTime = (endTime - startTime) * 24 * 3600
 runTime = Format(runTime, "0.00")
 
-'Progress: Complete
-    Application.Cursor = xlDefault
-    Application.StatusBar = False
-    'Application.ScreenUpdating = True
-
 With Report
     .ndeltas = Book_Diffs
     .ndif = Book_UnHLs
     .tbIncHL = Book_FalseHLs
-    .NewSheets = AddedSheets
-    .OldSheets = RemovedSheets
+    .NewSheets = Sheets_Added
+    .OldSheets = Sheets_Removed
     .NewSheets.Width = 160
     .OldSheets.Width = 160
     If .NewSheets.Height >= .OldSheets.Height Then
@@ -384,11 +357,21 @@ With Report
     .Show vbModeless
 End With
 
-GrngCompareFilesCell.Interior.Color = COLOR_GOOD
+Finally:
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    Application.Cursor = xlDefault
+    Application.StatusBar = False
+    
+    Exit Function
 
-End Sub
+Catch:
+    MsgBox "Any error. Close, don't save and retry. " & vbLf & vbLf & Err.Description, vbCritical, F_NAME
+    Resume Finally
 
-Function getVal(strValue As Variant) As String
+End Function
+
+Private Function getVal(strValue As Variant) As String
 
 If IsError(strValue) = True Then
     Select Case strValue
@@ -415,7 +398,7 @@ End If
 
 End Function
 
-Function IsHL(ByRef aRange As Range) As Boolean
+Public Function IsHL(ByRef aRange As Range) As Boolean
     On Error GoTo err_IsHL
     
     Const COLOR_WHITE As Integer = 2
@@ -435,37 +418,6 @@ err_IsHL:
 
 End Function
 
-Sub ExcelStateSave()
-    With Application
-    
-        'Save current state of Excel settings
-        appCalculation = .Calculation
-        appDisplayStatusBar = .DisplayStatusBar
-        appEnableEvents = .EnableEvents
-        appScreenUpdating = .ScreenUpdating
-        
-        'Turn off unnecessary updates
-        .Calculation = xlCalculationManual
-        .DisplayStatusBar = False
-        .EnableEvents = False
-        .ScreenUpdating = False
-        
-        '.Visible = False
-    
-    End With
-End Sub
-Sub ExcelStateRestore()
-    'Restore current state of Excel settings
-    With Application
-        .Calculation = appCalculation
-        .DisplayStatusBar = appDisplayStatusBar
-        .EnableEvents = appEnableEvents
-        .ScreenUpdating = appScreenUpdating
-        
-        '.Visible = True
-    End With
-End Sub
-
 Private Function unionUsedRanges(ByRef Range1 As Range, ByRef Range2 As Range) As String
 'Takes new range and old range. Combines them into a simple range (A1:LastCol,LastRow)
     
@@ -482,8 +434,8 @@ Private Function unionUsedRanges(ByRef Range1 As Range, ByRef Range2 As Range) A
     Dim ColNum As Variant
     Dim ColNums() As Variant
     
-    Dim LastRow As Integer
-    Dim LastCol As Integer
+    Dim LastRow As Long
+    Dim LastCol As Long
     
     Dim LastCellAddr As String
     Dim RangeAddress As String
@@ -503,12 +455,12 @@ Private Function unionUsedRanges(ByRef Range1 As Range, ByRef Range2 As Range) A
     
     'Find last row
     For Each RowNum In RowNums
-        If CInt(RowNum) > LastRow Then LastRow = RowNum
+        If CLng(RowNum) > LastRow Then LastRow = CLng(RowNum)
     Next RowNum
     
     'Find last column
     For Each ColNum In ColNums
-        If CInt(ColNum) > LastCol Then LastCol = ColNum
+        If CLng(ColNum) > LastCol Then LastCol = CLng(ColNum)
     Next ColNum
     
     LastCellAddr = Range1.Parent.Cells(LastRow, LastCol).Address

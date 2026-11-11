@@ -10,5 +10,5 @@ Attribute VB_Exposed = True
 Option Explicit
 
 Private Sub cbCompare_Click()
-    MainMenu.Show
+    MainMenu.Init
 End Sub
